@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H&H FEP Log Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111111;
+      color: #c1bfb5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      border-bottom: 0.5px solid #2a2a2a;
+      padding: 14px 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 15px;
+      font-weight: 500;
+      color: #c1bfb5;
+      letter-spacing: 0.02em;
+    }
+    header span {
+      font-size: 12px;
+      color: #4a4845;
+      font-family: monospace;
+    }
+
+    main {
+      width: 100%;
+      max-width: 640px;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Widget ── */
+    .widget {
+      background: #191919;
+      border: 0.5px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+
+    .label { font-size: 11px; color: #7a786e; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 5px; display: block; }
+
+    textarea {
+      width: 100%; min-height: 110px; resize: vertical;
+      font-family: monospace; font-size: 12px;
+      background: #111; color: #c1bfb5;
+      border: 0.5px solid #333; border-radius: 6px; padding: 8px;
+    }
+    textarea::placeholder { color: #4a4845; }
+    textarea:focus { outline: none; border-color: #555; }
+
+    .row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+
+    button {
+      cursor: pointer; font-family: inherit;
+      background: #222; color: #c1bfb5;
+      border: 0.5px solid #3a3835; border-radius: 6px;
+      transition: background 0.12s;
+    }
+    button:hover { background: #2a2a2a; }
+    .btn-primary { padding: 6px 16px; font-size: 13px; }
+    .btn-ghost   { padding: 6px 12px; font-size: 13px; color: #7a786e; }
+    .btn-ghost:hover { color: #c1bfb5; }
+    .btn-danger  { padding: 4px 10px; font-size: 12px; color: #c0624a; border-color: #4a2a20; }
+    .btn-danger:hover { background: #2a1a14; }
+
+    input[type=text] {
+      font-family: inherit; font-size: 13px; flex: 1; padding: 5px 10px;
+      background: #111; color: #c1bfb5;
+      border: 0.5px solid #333; border-radius: 6px;
+    }
+    input[type=text]::placeholder { color: #4a4845; }
+    input[type=text]:focus { outline: none; border-color: #555; }
+
+    .char-count { font-size: 11px; color: #4a4845; font-family: monospace; white-space: nowrap; }
+    .char-count.near { color: #c49a45; }
+
+    .divider { border: none; border-top: 0.5px solid #2e2e2e; margin: 1rem 0; }
+
+    .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: .75rem 0; }
+    .mcard { background: #222; border: 0.5px solid #2e2e2e; border-radius: 6px; padding: 10px 12px; }
+    .mcard-label { font-size: 11px; color: #7a786e; margin-bottom: 3px; }
+    .mcard-val { font-size: 22px; font-weight: 500; font-family: monospace; color: #c1bfb5; }
+    .mcard-combat { border-left: 3px solid #A32D2D; }
+
+    .sec { font-size: 11px; color: #7a786e; letter-spacing: .07em; text-transform: uppercase; margin: 1.1rem 0 .4rem; font-weight: 500; }
+
+    .bar-row   { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+    .bar-name  { font-size: 12px; color: #9a9890; width: 88px; text-align: right; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 14px; background: #2a2a2a; border-radius: 3px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 3px; transition: width .35s ease; }
+    .bar-count { font-size: 12px; font-family: monospace; font-weight: 500; width: 30px; color: #c1bfb5; }
+
+    .tag      { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 5px; font-family: monospace; }
+    .tag-good { background: #1a2e14; color: #7ab85a; }
+    .tag-warn { background: #2e2210; color: #c49a45; }
+    .tag-bad  { background: #2e1414; color: #c05a5a; }
+
+    .insights { font-size: 13px; color: #9a9890; line-height: 1.65; }
+
+    .filtered { font-size: 11px; font-family: monospace; max-height: 100px; overflow-y: auto; border: 0.5px solid #2e2e2e; border-radius: 6px; padding: 6px 8px; background: #111; }
+    .filtered div { padding: 1px 0; color: #7a786e; }
+    .filtered span { color: #BA7517; font-weight: 500; }
+
+    .empty { color: #4a4845; font-size: 13px; padding: .5rem 0; }
+
+    .hist-list { display: flex; flex-direction: column; gap: 6px; margin-top: .5rem; }
+    .hist-item { display: flex; align-items: center; gap: 8px; border: 0.5px solid #2e2e2e; border-radius: 6px; padding: 8px 12px; cursor: pointer; transition: background .15s; background: #1a1a1a; }
+    .hist-item:hover  { background: #222; }
+    .hist-item.active { border-color: #555; background: #222; }
+    .hist-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #c1bfb5; }
+    .hist-meta { font-size: 11px; color: #5a5855; font-family: monospace; white-space: nowrap; }
+    .hist-del  { font-size: 11px; color: #c0624a; cursor: pointer; padding: 2px 6px; border: none; background: none; border-radius: 4px; }
+    .hist-del:hover { background: #2a1a14; }
+
+    .tabs { display: flex; border-bottom: 0.5px solid #2e2e2e; margin-bottom: 1rem; }
+    .tab  { font-size: 13px; padding: 6px 14px; cursor: pointer; border: none; background: none; color: #5a5855; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
+    .tab:hover { color: #9a9890; }
+    .tab.active { color: #c1bfb5; border-bottom-color: #c1bfb5; font-weight: 500; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .storage-note { font-size: 11px; color: #4a4845; margin-top: .5rem; }
+
+    .compare-grid  { display: flex; flex-direction: column; gap: 6px; }
+    .compare-row   { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .compare-label { width: 88px; text-align: right; color: #7a786e; flex-shrink: 0; }
+    .compare-bars  { display: flex; flex: 1; gap: 3px; }
+    .compare-seg   { height: 12px; border-radius: 2px; min-width: 2px; }
+    .compare-val   { font-size: 11px; font-family: monospace; color: #7a786e; white-space: nowrap; }
+
+    .legend-row  { display: flex; flex-wrap: wrap; gap: 8px; margin: .5rem 0 .75rem; }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #7a786e; }
+    .legend-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    input[type=checkbox] { accent-color: #BA7517; }
+
+    footer {
+      margin-top: auto;
+      padding: 1.5rem;
+      font-size: 11px;
+      color: #3a3835;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>H&amp;H FEP Log Analyzer</h1>
+  <span>Haven &amp; Hearth · stat gain tracker</span>
+</header>
+
+<main>
+  <div class="widget">
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('analyze')">Analyze</button>
+      <button class="tab" onclick="switchTab('history')">History <span id="histBadge"></span></button>
+      <button class="tab" onclick="switchTab('compare')">Compare</button>
+    </div>
+
+    <!-- ANALYZE -->
+    <div id="tab-analyze" class="panel active">
+      <span class="label">Raw game log</span>
+      <textarea id="logInput" placeholder="You gained Agility +1&#10;You gained Strength +2&#10;[system] Connection established&#10;You gained Constitution +1&#10;..."></textarea>
+      <div class="row">
+        <input type="text" id="sessionName" placeholder="Session name (optional)" maxlength="25" style="max-width:220px;" oninput="updateCharCount()">
+        <span class="char-count" id="charCount"></span>
+        <button class="btn-primary" onclick="analyze()">Analyze</button>
+        <button class="btn-ghost"   onclick="clearInput()">Clear</button>
+      </div>
+      <div id="results" style="display:none;">
+        <hr class="divider">
+        <div class="sec">Summary</div>
+        <div class="grid4" id="summaryCards"></div>
+        <div class="sec">Stat breakdown</div>
+        <div id="barChart"></div>
+        <div class="sec">Matched lines</div>
+        <div class="filtered" id="matchedLines"></div>
+        <div class="sec">Insights</div>
+        <div class="insights" id="insightsBox"></div>
+      </div>
+      <div id="emptyMsg" class="empty" style="display:none;">No stat gain lines found. Lines must match: <code>You gained [Stat] +N</code></div>
+    </div>
+
+    <!-- HISTORY -->
+    <div id="tab-history" class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+        <span class="label" style="margin:0;">Saved sessions</span>
+        <button class="btn-danger" onclick="clearAll()">Clear all</button>
+      </div>
+      <div id="histList"><div class="empty">No sessions saved yet. Run an analysis first.</div></div>
+      <div class="storage-note">Sessions are saved to localStorage in your browser.</div>
+    </div>
+
+    <!-- COMPARE -->
+    <div id="tab-compare" class="panel">
+      <div class="label">Select sessions to compare (up to 4)</div>
+      <div id="compareSelect" style="display:flex;flex-direction:column;gap:5px;margin-bottom:1rem;"></div>
+      <button class="btn-primary" onclick="renderCompare()">Compare</button>
+      <div id="compareOut" style="margin-top:1rem;"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer>Haven &amp; Hearth is a game by Björn &amp; Loftar. This tool is unofficial.</footer>
+
+<script>
+  const COMBAT = ['Agility','Strength','Constitution'];
+  const STAT_COLORS = {
+    Agility:'#378ADD', Strength:'#A32D2D', Constitution:'#0F6E56',
+    Charisma:'#993556', Perception:'#534AB7', Will:'#BA7517',
+    Intelligence:'#185FA5', Dexterity:'#639922', Psyche:'#7F77DD'
+  };
+  const CMP_COLORS = ['#378ADD','#BA7517','#0F6E56','#993556'];
+
+  let sessions = [];
+  let activeSessionId = null;
+
+  function loadSessions() {
+    try { sessions = JSON.parse(localStorage.getItem('fep-sessions') || '[]'); } catch(e) { sessions = []; }
+    renderHistList(); renderCompareSelect(); updateBadge();
+  }
+
+  function saveSessions() {
+    try { localStorage.setItem('fep-sessions', JSON.stringify(sessions)); } catch(e) {}
+  }
+
+  function updateBadge() {
+    document.getElementById('histBadge').textContent = sessions.length ? `(${sessions.length})` : '';
+  }
+
+  function updateCharCount() {
+    const inp = document.getElementById('sessionName');
+    const cc  = document.getElementById('charCount');
+    const len = inp.value.length;
+    cc.textContent = len > 0 ? `${len}/25` : '';
+    cc.className = 'char-count' + (len >= 20 ? ' near' : '');
+  }
+
+  function switchTab(t) {
+    document.querySelectorAll('.tab').forEach((el, i) => {
+      el.classList.toggle('active', ['analyze','history','compare'][i] === t);
+    });
+    document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + t).classList.add('active');
+    if (t === 'history') renderHistList();
+    if (t === 'compare') renderCompareSelect();
+  }
+
+  function clearInput() {
+    document.getElementById('logInput').value = '';
+    document.getElementById('logInput').focus();
+  }
+
+  function analyze() {
+    const raw = document.getElementById('logInput').value;
+    const nameInput = document.getElementById('sessionName').value.trim().slice(0, 25);
+    const pattern = /You gained (\w+) \+(\d+)/g;
+    const totals = {}; const matched = []; let m;
+    while ((m = pattern.exec(raw)) !== null) {
+      const stat = m[1], val = parseInt(m[2]);
+      totals[stat] = (totals[stat] || 0) + val;
+      matched.push({ stat, val });
+    }
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('emptyMsg').style.display = 'none';
+    if (!matched.length) { document.getElementById('emptyMsg').style.display = 'block'; return; }
+    const now = new Date();
+    const id  = now.getTime().toString();
+    const name = nameInput || (now.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + ' ' + now.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'}));
+    const grandTotal  = Object.values(totals).reduce((s, v) => s + v, 0);
+    const combatTotal = COMBAT.reduce((s, st) => s + (totals[st] || 0), 0);
+    const session = { id, name, totals, grandTotal, combatTotal, lineCount: matched.length, ts: now.toISOString() };
+    sessions.unshift(session);
+    saveSessions(); updateBadge(); renderHistList(); renderCompareSelect();
+    renderResults(session, matched);
+    activeSessionId = id;
+  }
+
+  function renderResults(session, matched) {
+    const { totals, grandTotal, combatTotal } = session;
+    const nonCombat  = grandTotal - combatTotal;
+    const statNames  = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+    const maxVal     = Math.max(...Object.values(totals));
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('summaryCards').innerHTML = `
+      <div class="mcard"><div class="mcard-label">Total gains</div><div class="mcard-val">${grandTotal}</div></div>
+      <div class="mcard mcard-combat"><div class="mcard-label">Combat stats</div><div class="mcard-val">${combatTotal}</div></div>
+      <div class="mcard"><div class="mcard-label">Non-combat</div><div class="mcard-val">${nonCombat}</div></div>
+      <div class="mcard"><div class="mcard-label">Unique stats</div><div class="mcard-val">${statNames.length}</div></div>
+      <div class="mcard"><div class="mcard-label">Matched lines</div><div class="mcard-val">${session.lineCount}</div></div>`;
+    document.getElementById('barChart').innerHTML = statNames.map(stat => {
+      const pct   = Math.round((totals[stat] / maxVal) * 100);
+      const color = STAT_COLORS[stat] || '#666';
+      return `<div class="bar-row"><div class="bar-name">${stat}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div><div class="bar-count">+${totals[stat]}</div></div>`;
+    }).join('');
+    if (matched && matched.length) {
+      document.getElementById('matchedLines').innerHTML = matched.map(e => `<div>You gained <span>${e.stat} +${e.val}</span></div>`).join('');
+    }
+    document.getElementById('insightsBox').innerHTML = buildInsights(totals, statNames, grandTotal, combatTotal, nonCombat, statNames.length);
+  }
+
+  function buildInsights(totals, statNames, grandTotal, combatTotal, nonCombat, count) {
+    if (!grandTotal) return 'No data.';
+    const lines = [];
+    const combatPct = Math.round((combatTotal / grandTotal) * 100);
+    const nonPct    = 100 - combatPct;
+    if (combatPct >= 70)  lines.push(`<span class="tag tag-warn">combat-heavy</span> ${combatPct}% of gains in Agility, Strength, or Constitution.`);
+    else if (nonPct >= 70) lines.push(`<span class="tag tag-good">support-focused</span> ${nonPct}% non-combat gains — great for crafting/trading builds.`);
+    else lines.push(`<span class="tag tag-good">balanced</span> ${combatPct}% combat / ${nonPct}% non-combat.`);
+    const top = statNames[0];
+    if (top) { const topPct = Math.round((totals[top] / grandTotal) * 100); if (topPct >= 35) lines.push(`<span class="tag tag-warn">dominant stat</span> <b style="color:#c1bfb5">${top}</b> is ${topPct}% of all gains.`); }
+    if (totals['Charisma']) { const c = Math.round((totals['Charisma'] / grandTotal) * 100); if (c >= 20) lines.push(`<span class="tag tag-warn">high Charisma</span> ${c}% Charisma — social/trade build?`); }
+    if (count === 1) lines.push(`<span class="tag tag-bad">single stat</span> Only one stat — very specialized food.`);
+    else if (count >= 5) lines.push(`<span class="tag tag-good">diverse</span> ${count} different stats — excellent variety.`);
+    COMBAT.forEach(st => { if (!totals[st]) lines.push(`<span class="tag tag-warn">missing</span> No <b style="color:#c1bfb5">${st}</b> gains.`); });
+    return lines.join('<br><br>');
+  }
+
+  function renderHistList() {
+    const el = document.getElementById('histList');
+    if (!sessions.length) { el.innerHTML = '<div class="empty">No sessions saved yet. Run an analysis first.</div>'; return; }
+    el.innerHTML = '<div class="hist-list">' + sessions.map(s => {
+      const d = new Date(s.ts);
+      const dateStr = d.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'});
+      return `<div class="hist-item${activeSessionId === s.id ? ' active' : ''}" onclick="loadSession('${s.id}')">
+        <div style="flex:1;min-width:0;">
+          <div class="hist-name">${s.name}</div>
+          <div class="hist-meta">${dateStr} · +${s.grandTotal} total · ${s.lineCount} lines</div>
+        </div>
+        <button class="hist-del" onclick="event.stopPropagation();deleteSession('${s.id}')">✕</button>
+      </div>`;
+    }).join('') + '</div>';
+  }
+
+  function renderCompareSelect() {
+    const el = document.getElementById('compareSelect');
+    if (!sessions.length) { el.innerHTML = '<div class="empty">No sessions to compare yet.</div>'; return; }
+    el.innerHTML = sessions.map((s, i) => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:#9a9890;">
+        <input type="checkbox" value="${s.id}" ${i < 2 ? 'checked' : ''}>
+        <span style="color:#c1bfb5;">${s.name}</span>
+        <span style="color:#5a5855;font-size:11px;font-family:monospace;">+${s.grandTotal}</span>
+      </label>`).join('');
+  }
+
+  function loadSession(id) {
+    const s = sessions.find(x => x.id === id);
+    if (!s) return;
+    activeSessionId = id;
+    switchTab('analyze');
+    document.getElementById('sessionName').value = s.name;
+    updateCharCount();
+    renderResults(s, null);
+    document.getElementById('matchedLines').innerHTML = '<div style="color:#4a4845;font-size:11px;">Loaded from history — raw lines not stored.</div>';
+    renderHistList();
+  }
+
+  function deleteSession(id) {
+    sessions = sessions.filter(s => s.id !== id);
+    saveSessions(); updateBadge(); renderHistList(); renderCompareSelect();
+    if (activeSessionId === id) { activeSessionId = null; document.getElementById('results').style.display = 'none'; }
+  }
+
+  function clearAll() {
+    if (!confirm('Clear all saved sessions?')) return;
+    sessions = [];
+    localStorage.removeItem('fep-sessions');
+    updateBadge(); renderHistList(); renderCompareSelect();
+    activeSessionId = null;
+    document.getElementById('results').style.display = 'none';
+  }
+
+  function renderCompare() {
+    const checked = [...document.querySelectorAll('#compareSelect input:checked')].map(i => i.value);
+    const sel = sessions.filter(s => checked.includes(s.id)).slice(0, 4);
+    const out = document.getElementById('compareOut');
+    if (sel.length < 2) { out.innerHTML = '<div class="empty">Select at least 2 sessions to compare.</div>'; return; }
+    const statSet = new Set();
+    sel.forEach(s => Object.keys(s.totals).forEach(k => statSet.add(k)));
+    const stats = [...statSet].sort((a, b) => {
+      return sel.reduce((s, ss) => s + (ss.totals[b] || 0), 0) - sel.reduce((s, ss) => s + (ss.totals[a] || 0), 0);
+    });
+    const maxVal = Math.max(...sel.map(s => Math.max(...Object.values(s.totals))));
+    out.innerHTML = `
+      <div class="legend-row">${sel.map((s, i) => `<div class="legend-item"><div class="legend-dot" style="background:${CMP_COLORS[i]};"></div>${s.name}</div>`).join('')}</div>
+      <div class="compare-grid">
+        ${stats.map(stat => `<div class="compare-row">
+          <div class="compare-label">${stat}</div>
+          <div class="compare-bars">${sel.map((s, i) => { const v = s.totals[stat] || 0; const w = maxVal ? Math.round((v / maxVal) * 140) : 0; return `<div class="compare-seg" style="width:${Math.max(w,2)}px;background:${CMP_COLORS[i]};opacity:.9;" title="${s.name}: +${v}"></div>`; }).join('')}</div>
+          <div class="compare-val">${sel.map(s => `+${s.totals[stat] || 0}`).join(' / ')}</div>
+        </div>`).join('')}
+      </div>
+      <hr class="divider">
+      <div class="grid4">${sel.map((s, i) => `<div class="mcard" style="border-left:3px solid ${CMP_COLORS[i]};"><div class="mcard-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div><div class="mcard-val">+${s.grandTotal}</div><div style="font-size:11px;color:#5a5855;margin-top:2px;font-family:monospace;">combat ${s.combatTotal}</div></div>`).join('')}</div>`;
+  }
+
+  loadSessions();
+</script>
+</body>
+</html>
